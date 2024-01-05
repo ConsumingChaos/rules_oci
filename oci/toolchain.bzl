@@ -60,7 +60,7 @@ def _registry_toolchain_impl(ctx):
     launcher = ctx.executable.launcher
 
     template_variables = platform_common.TemplateVariableInfo({
-        "REGISTRY_BIN": registry.path,
+        "REGISTRY_BINARY": registry.path,
         "LAUNCHER_WRAPPER": launcher.path,
     })
     default = DefaultInfo(

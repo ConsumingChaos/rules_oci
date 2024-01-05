@@ -60,6 +60,8 @@ sh_test(
     args = [
         "$(CRANE_BIN)",
         "$(LAUNCHER_WRAPPER)",
+        "$(COREUTILS_BIN)",
+        "$(SED_BIN)",
         "$(location :push_image)",
         "$(location :push_image_index)",
         "$(location :push_image_repository_file)",
@@ -70,10 +72,14 @@ sh_test(
         ":push_image_index",
         ":push_image_repository_file",
         ":push_image_wo_tags",
+        "@coreutils_toolchains//:resolved_toolchain",
+        "@sed_toolchains//:resolved_toolchain",
         "@oci_crane_registry_toolchains//:current_toolchain",
         "@oci_crane_toolchains//:current_toolchain",
     ],
     toolchains = [
+        "@coreutils_toolchains//:resolved_toolchain",
+        "@sed_toolchains//:resolved_toolchain",
         "@oci_crane_toolchains//:current_toolchain",
         "@oci_crane_registry_toolchains//:current_toolchain",
     ],

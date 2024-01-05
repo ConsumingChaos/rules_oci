@@ -27,7 +27,7 @@ oci_image_index(
 
 _attrs = {
     "images": attr.label_list(mandatory = True, doc = "List of labels to oci_image targets."),
-    "_image_index_sh_tpl": attr.label(default = "image_index.sh.tpl", allow_single_file = True),
+    "_image_index_sh": attr.label(default = "image_index.sh", allow_single_file = True),
 }
 
 def _expand_image_to_args(image, expander):
@@ -43,28 +43,23 @@ def _oci_image_index_impl(ctx):
     yq = ctx.toolchains["@aspect_bazel_lib//lib:yq_toolchain_type"]
     coreutils = ctx.toolchains["@aspect_bazel_lib//lib:coreutils_toolchain_type"]
 
-    launcher = ctx.actions.declare_file("image_index_{}.sh".format(ctx.label.name))
-    ctx.actions.expand_template(
-        template = ctx.file._image_index_sh_tpl,
-        output = launcher,
-        is_executable = True,
-        substitutions = {
-            "{{yq_path}}": yq.yqinfo.bin.path,
-            "{{coreutils_path}}": coreutils.coreutils_info.bin.path,
-        },
-    )
-
     output = ctx.actions.declare_directory(ctx.label.name)
 
     args = ctx.actions.args()
     args.add(output.path, format = "--output=%s")
     args.add_all(ctx.files.images, map_each = _expand_image_to_args, expand_directories = False)
 
+    action_env = {
+        "YQ": yq.yqinfo.bin.path,
+        "COREUTILS": coreutils.coreutils_info.bin.path,
+    }
+
     ctx.actions.run(
         inputs = ctx.files.images,
         arguments = [args],
         outputs = [output],
-        executable = launcher,
+        env = action_env,
+        executable = ctx.file._image_index_sh,
         tools = [yq.yqinfo.bin, coreutils.coreutils_info.bin],
         mnemonic = "OCIIndex",
         progress_message = "OCI Index %{label}",

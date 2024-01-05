@@ -4,18 +4,28 @@
 : ${COREUTILS?}
 : ${SED?}
 
+readonly ZOT="${REGISTRY_BINARY}"
+readonly TMPDIR=$("${COREUTILS}" mktemp)
+
 function start_registry() {
     local deadline="${1:-5}"
+    local config_path="${REGISTRY_STORAGE_DIR}/config.json"
     local registry_pid="${REGISTRY_STORAGE_DIR}/proc.pid"
 
-    "${COREUTILS}" mkdir -p "${storage_dir}"
-    "${REGISTRY_BINARY}" >> "${REGISTRY_STORAGE_DIR}/registry.log" 2>&1 &
+    "${COREUTILS}" cat > "${config_path}" <<EOF
+{
+    "storage": { "rootDirectory": "${REGISTRY_STORAGE_DIR}/..", "dedupe": false, "commit": true },
+    "http":{ "port": "0", "address": "127.0.0.1" },
+    "log":{ "level": "info" }
+}
+EOF
+    HOME="${TMPDIR}" "${ZOT}" serve "${config_path}" >> "${REGISTRY_STORAGE_DIR}/registry.log" 2>&1 &
     "${COREUTILS}" echo "$!" > "${registry_pid}"
 
     local timeout=$((SECONDS+${deadline}))
 
     while [ "${SECONDS}" -lt "${timeout}" ]; do
-        local port=$("${COREUTILS}" cat "${REGISTRY_STORAGE_DIR}/registry.log" | "${SED}" -nr 's/port:([0-9]+)/\1/p')
+        local port=$("${COREUTILS}" cat "${REGISTRY_STORAGE_DIR}/registry.log" | "${SED}" -nr 's/.+"port":([0-9]+),.+/\1/p')
         if [ -n "${port}" ]; then
             break
         fi
@@ -29,12 +39,13 @@ function start_registry() {
 }
 
 function stop_registry() {
+    "${COREUTILS}" rm -rf "${REGISTRY_STORAGE_DIR}/.uploads"
+    "${COREUTILS}" rm -r "${REGISTRY_STORAGE_DIR}/config.json"
     local registry_pid="${REGISTRY_STORAGE_DIR}/proc.pid"
     if [[ ! -f "${registry_pid}" ]]; then
-        "${COREUTILS}" echo "Registry not started" >&2
         return 0
     fi
-    "${COREUTILS}" kill -9 "$("${COREUTILS}" cat "${registry_pid}")" || true
+    "${COREUTILS}" kill -9 "$(cat "${registry_pid}")" || true
     "${COREUTILS}" rm -f "${registry_pid}"
     return 0
 }

@@ -1,27 +1,31 @@
 #!/usr/bin/env bash
 set -o pipefail -o errexit -o nounset
 
+# Ensure environment is provided by caller
+: ${COREUTILS?}
+: ${YQ?}
+: ${TAR?}
+
 readonly FORMAT="{{format}}"
-readonly STAGING_DIR=$(mktemp -d)
-readonly YQ="{{yq}}"
+readonly STAGING_DIR=$("${COREUTILS}" mktemp -d)
 readonly IMAGE_DIR="{{image_dir}}"
 readonly BLOBS_DIR="${STAGING_DIR}/blobs"
 readonly TARBALL_PATH="{{tarball_path}}"
-readonly REPOTAGS=($(cat "{{tags}}"))
+readonly REPOTAGS=($("${COREUTILS}" cat "{{tags}}"))
 readonly INDEX_FILE="${IMAGE_DIR}/index.json"
 
 cp_f_with_mkdir() {
   SRC="$1"
   DST="$2"
-  mkdir -p "$(dirname "${DST}")"
-  cp -f "${SRC}" "${DST}"
+  "${COREUTILS}" mkdir -p "$("${COREUTILS}" dirname "${DST}")"
+  "${COREUTILS}" cp -f "${SRC}" "${DST}"
 }
 
-MANIFEST_DIGEST=$(${YQ} eval '.manifests[0].digest | sub(":"; "/")' "${INDEX_FILE}" | tr  -d '"')
+MANIFEST_DIGEST=$(${YQ} eval '.manifests[0].digest | sub(":"; "/")' "${INDEX_FILE}" | "${COREUTILS}" tr  -d '"')
 
 MANIFESTS_LENGTH=$("${YQ}" eval '.manifests | length' "${INDEX_FILE}")
 if [[ "${MANIFESTS_LENGTH}" != 1 ]]; then
-  echo >&2 "Expected exactly one manifest in ${INDEX_FILE}"
+  "${COREUTILS}" echo >&2 "Expected exactly one manifest in ${INDEX_FILE}"
   exit 1
 fi
 
@@ -30,15 +34,15 @@ MEDIA_TYPE=$("${YQ}" --unwrapScalar eval ".manifests[0].mediaType" "${INDEX_FILE
 # Check that we know how to generate the output format given the input format.
 # We may expand the supported options here in the future, but for now,
 if [[ "${FORMAT}" != "docker" && "${FORMAT}" != "oci" ]]; then
-  echo >&2 "Unknown format: ${FORMAT}. Only support docker|oci"
+  "${COREUTILS}" echo >&2 "Unknown format: ${FORMAT}. Only support docker|oci"
   exit 1
 fi
 if [[ "${FORMAT}" == "oci" && "${MEDIA_TYPE}" != "application/vnd.oci.image.index.v1+json" && "${MEDIA_TYPE}" != "application/vnd.docker.distribution.manifest.v2+json" ]]; then
-  echo >&2 "Format oci is only supported for oci_image_index targets but saw ${MEDIA_TYPE}"
+  "${COREUTILS}" echo >&2 "Format oci is only supported for oci_image_index targets but saw ${MEDIA_TYPE}"
   exit 1
 fi
 if [[ "${FORMAT}" == "docker" && "${MEDIA_TYPE}" != "application/vnd.oci.image.manifest.v1+json" && "${MEDIA_TYPE}" != "application/vnd.docker.distribution.manifest.v2+json" ]]; then
-  echo >&2 "Format docker is only supported for oci_image targets but saw ${MEDIA_TYPE}"
+  "${COREUTILS}" echo >&2 "Format docker is only supported for oci_image targets but saw ${MEDIA_TYPE}"
   exit 1
 fi
 
@@ -46,7 +50,7 @@ if [[ "${FORMAT}" == "oci" ]]; then
   # Handle multi-architecture image indexes.
   # Ideally the toolchains we rely on would output these for us, but they don't seem to.
 
-  echo -n '{"imageLayoutVersion": "1.0.0"}' > "${STAGING_DIR}/oci-layout"
+  "${COREUTILS}" echo -n '{"imageLayoutVersion": "1.0.0"}' > "${STAGING_DIR}/oci-layout"
 
   INDEX_FILE_MANIFEST_DIGEST=$("${YQ}" eval '.manifests[0].digest | sub(":"; "/")' "${INDEX_FILE}" | tr  -d '"')
   INDEX_FILE_MANIFEST_BLOB_PATH="${IMAGE_DIR}/blobs/${INDEX_FILE_MANIFEST_DIGEST}"
@@ -112,7 +116,7 @@ if [[ "${FORMAT}" == "oci" ]]; then
   # }
   repo_tags="${REPOTAGS[@]}" "${YQ}" -o json eval "(.manifests = ${MANIFEST_COPIES}) *d {\"manifests\": (env(repo_tags) | split \" \" | map {\"annotations\": {\"org.opencontainers.image.ref.name\": .}})}" "${INDEX_FILE}" > "${STAGING_DIR}/index.json"
 
-  tar --directory "${STAGING_DIR}" --create --no-xattr --file "${TARBALL_PATH}" index.json blobs oci-layout
+  "${TAR}" -C "${STAGING_DIR}" -cf "${TARBALL_PATH}" index.json blobs oci-layout
   exit 0
 fi
 
@@ -137,4 +141,4 @@ layers="${LAYERS}" \
         --output-format json > "${STAGING_DIR}/manifest.json"
 
 # TODO: https://github.com/bazel-contrib/rules_oci/issues/217
-tar --directory "${STAGING_DIR}" --create --no-xattr --file "${TARBALL_PATH}" manifest.json blobs
+"${TAR}" -C "${STAGING_DIR}" -cf "${TARBALL_PATH}" manifest.json blobs

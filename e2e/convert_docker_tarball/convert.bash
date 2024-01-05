@@ -21,14 +21,21 @@ readonly OUTPUT="${1}"
 readonly TARBALL="${2}"
 readonly CRANE="${RUNFILES}/${3#"external/"}"
 readonly REGISTRY_LAUNCHER=${RUNFILES}/${4#"external/"}
+readonly COREUTILS="${RUNFILES}/${5#"external/"}"
+readonly SED="${RUNFILES}/${6#"external/"}"
 
 
 # Launch a registry instance at a random port
+export REGISTRY_BINARY="${CRANE}"
+export REGISTRY_STORAGE_DIR="${TMP}"
+export COREUTILS
+export SED
 source "${REGISTRY_LAUNCHER}"
-REGISTRY=$(start_registry $TMP $TMP/output.log)
-trap "stop_registry ${TMP}" EXIT
 
-readonly REPOSITORY="${REGISTRY}/local" 
+REGISTRY=$(start_registry)
+trap "stop_registry" EXIT
+
+readonly REPOSITORY="${REGISTRY}/local"
 
 
 REF=$(mktemp)

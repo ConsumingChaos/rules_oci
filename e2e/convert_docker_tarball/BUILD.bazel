@@ -6,6 +6,8 @@ sh_binary(
     name = "convert",
     srcs = ["convert.bash"],
     data = [
+        "@coreutils_toolchains//:resolved_toolchain",
+        "@sed_toolchains//:resolved_toolchain",
         "@oci_crane_registry_toolchains//:current_toolchain",
         "@oci_crane_toolchains//:current_toolchain",
     ],
@@ -21,10 +23,14 @@ run_binary(
         "$(location :image.tar)",
         "$(CRANE_BIN)",
         "$(LAUNCHER_WRAPPER)",
+        "$(COREUTILS_BIN)",
+        "$(SED_BIN)",
     ],
     out_dirs = ["oci"],
     tool = ":convert",
     toolchains = [
+        "@coreutils_toolchains//:resolved_toolchain",
+        "@sed_toolchains//:resolved_toolchain",
         "@oci_crane_toolchains//:current_toolchain",
         "@oci_crane_registry_toolchains//:current_toolchain",
     ],

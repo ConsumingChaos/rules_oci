@@ -103,26 +103,15 @@ def _oci_image_impl(ctx):
 
     crane = ctx.toolchains["@rules_oci//oci:crane_toolchain_type"]
     registry = ctx.toolchains["@rules_oci//oci:registry_toolchain_type"]
+    coreutils = ctx.toolchains["@aspect_bazel_lib//lib:coreutils_toolchain_type"]
+    grep = ctx.toolchains["@aspect_bazel_lib//lib:grep_toolchain_type"]
     jq = ctx.toolchains["@aspect_bazel_lib//lib:jq_toolchain_type"]
+    sed = ctx.toolchains["@aspect_bazel_lib//lib:sed_toolchain_type"]
 
     output = ctx.actions.declare_directory(ctx.label.name)
 
-    # create the image builder
-    builder = ctx.actions.declare_file("image_%s.sh" % ctx.label.name)
-    ctx.actions.expand_template(
-        template = ctx.file._image_sh,
-        output = builder,
-        is_executable = True,
-        substitutions = {
-            "{{registry_impl}}": registry.registry_info.launcher.path,
-            "{{crane_path}}": crane.crane_info.binary.path,
-            "{{jq_path}}": jq.jqinfo.bin.path,
-            "{{empty_tar}}": ctx.file._empty_tar.path,
-            "{{output}}": output.path,
-        },
-    )
+    inputs = [ctx.file._empty_tar] + ctx.files.tars
 
-    inputs = [builder, ctx.file._empty_tar] + ctx.files.tars
     args = ctx.actions.args()
     args.add("mutate")
 
@@ -169,7 +158,17 @@ def _oci_image_impl(ctx):
     if ctx.attr.workdir:
         args.add(ctx.attr.workdir, format = "--workdir=%s")
 
-    action_env = {}
+    action_env = {
+        "REGISTRY_BINARY": registry.registry_info.registry.path,
+        "REGISTRY_LAUNCHER": registry.registry_info.launcher.path,
+        "REGISTRY_STORAGE_DIR": output.path,
+        "EMPTY_TAR": ctx.file._empty_tar.path,
+        "CRANE": crane.crane_info.binary.path,
+        "COREUTILS": coreutils.coreutils_info.bin.path,
+        "GREP": grep.grep_info.bin.path,
+        "JQ": jq.jqinfo.bin.path,
+        "SED": sed.sed_info.bin.path,
+    }
 
     # Windows: Don't convert arguments like --entrypoint=/some/bin to --entrypoint=C:/msys64/some/bin
     if ctx.target_platform_has_constraint(ctx.attr._windows_constraint[platform_common.ConstraintValueInfo]):
@@ -185,8 +184,16 @@ def _oci_image_impl(ctx):
         arguments = [args],
         outputs = [output],
         env = action_env,
-        executable = util.maybe_wrap_launcher_for_windows(ctx, builder),
-        tools = [crane.crane_info.binary, registry.registry_info.launcher, registry.registry_info.registry, jq.jqinfo.bin],
+        executable = util.maybe_wrap_launcher_for_windows(ctx, ctx.file._image_sh),
+        tools = [
+            crane.crane_info.binary,
+            registry.registry_info.launcher,
+            registry.registry_info.registry,
+            coreutils.coreutils_info.bin,
+            grep.grep_info.bin,
+            jq.jqinfo.bin,
+            sed.sed_info.bin,
+        ],
         mnemonic = "OCIImage",
         progress_message = "OCI Image %{label}",
     )
@@ -205,6 +212,9 @@ oci_image = rule(
         "@bazel_tools//tools/sh:toolchain_type",
         "@rules_oci//oci:crane_toolchain_type",
         "@rules_oci//oci:registry_toolchain_type",
+        "@aspect_bazel_lib//lib:coreutils_toolchain_type",
+        "@aspect_bazel_lib//lib:grep_toolchain_type",
         "@aspect_bazel_lib//lib:jq_toolchain_type",
+        "@aspect_bazel_lib//lib:sed_toolchain_type",
     ],
 )

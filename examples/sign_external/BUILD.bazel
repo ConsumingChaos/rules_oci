@@ -12,7 +12,9 @@ sh_test(
     name = "test",
     srcs = ["test.bash"],
     args = [
+        "$(COREUTILS_BIN)",
         "$(JQ_BIN)",
+        "$(SED_BIN)",
         "$(CRANE_BIN)",
         "$(COSIGN_BIN)",
         "$(LAUNCHER_WRAPPER)",
@@ -22,7 +24,9 @@ sh_test(
     data = [
         ":sign",
         "@empty_image",
+        "@coreutils_toolchains//:resolved_toolchain",
         "@jq_toolchains//:resolved_toolchain",
+        "@sed_toolchains//:resolved_toolchain",
         "@oci_cosign_toolchains//:current_toolchain",
         "@oci_crane_registry_toolchains//:current_toolchain",
         "@oci_crane_toolchains//:current_toolchain",
@@ -31,6 +35,8 @@ sh_test(
         "@oci_crane_registry_toolchains//:current_toolchain",
         "@oci_cosign_toolchains//:current_toolchain",
         "@oci_crane_toolchains//:current_toolchain",
+        "@coreutils_toolchains//:resolved_toolchain",
         "@jq_toolchains//:resolved_toolchain",
+        "@sed_toolchains//:resolved_toolchain",
     ],
 )

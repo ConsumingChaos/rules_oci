@@ -4,18 +4,20 @@
 : ${COREUTILS?}
 : ${SED?}
 
+readonly CRANE="${REGISTRY_BINARY}"
+
 function start_registry() {
     local deadline="${1:-5}"
     local registry_pid="${REGISTRY_STORAGE_DIR}/proc.pid"
 
-    "${COREUTILS}" mkdir -p "${storage_dir}"
-    "${REGISTRY_BINARY}" >> "${REGISTRY_STORAGE_DIR}/registry.log" 2>&1 &
+    "${COREUTILS}" mkdir -p "${REGISTRY_STORAGE_DIR}"
+    "${CRANE}" registry serve --disk="${REGISTRY_STORAGE_DIR}" --address=localhost:0 >> "${REGISTRY_STORAGE_DIR}/registry.log" 2>&1 &
     "${COREUTILS}" echo "$!" > "${registry_pid}"
 
     local timeout=$((SECONDS+${deadline}))
 
     while [ "${SECONDS}" -lt "${timeout}" ]; do
-        local port=$("${COREUTILS}" cat "${REGISTRY_STORAGE_DIR}/registry.log" | "${SED}" -nr 's/port:([0-9]+)/\1/p')
+        local port=$("${COREUTILS}" cat "${REGISTRY_STORAGE_DIR}/registry.log" | "${SED}" -nr 's/.+serving on port ([0-9]+)/\1/p')
         if [ -n "${port}" ]; then
             break
         fi
@@ -31,7 +33,6 @@ function start_registry() {
 function stop_registry() {
     local registry_pid="${REGISTRY_STORAGE_DIR}/proc.pid"
     if [[ ! -f "${registry_pid}" ]]; then
-        "${COREUTILS}" echo "Registry not started" >&2
         return 0
     fi
     "${COREUTILS}" kill -9 "$("${COREUTILS}" cat "${registry_pid}")" || true
